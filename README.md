@@ -13,3 +13,29 @@ Because the intrinsically weak soft X-ray emissivity of the magnetosheath can fr
 
 By dynamically adjusting the integration window (up to a 10-minute maximum), the DTI method ensures an optimal balance between signal clarity and the preservation of the boundary's temporal dynamics.
 
+
+
+
+```
+from dti_pipeline import run_dti_pipeline
+import numpy as np
+
+
+
+# Run the pipeline for a specific time index
+status_valid, min_integration_time, final_image = run_dti_pipeline(
+    index=1850,                # Central index of the directory list
+    directories=my_dir_list,   # List of paths to your FITS directories
+    n_components=10,           # Recommended number of PCA components
+    max_ni=10,                 # Max integration time (minutes/frames)
+    ni_verif=3,                # Frames required to verify stability
+    ni_cusp=30                 # Window for slow-moving cusp detection
+)
+
+if status_valid:
+    print(f"Magnetopause is visible! Required integration time: {min_integration_time} min.")
+    # Proceed to boundary detection algorithms (e.g., Tangent Fitting)
+else:
+    print("Magnetopause is obscured or absent. Interpret downstream analysis with caution.")
+
+```
