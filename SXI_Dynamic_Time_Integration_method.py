@@ -140,29 +140,28 @@ def asymmetric_gaussian(x: np.ndarray, amplitude: float, mean: float,
     return y + min_val
 
 
+# Physical field-of-view grid for the phi (azimuthal) axis, in degrees.
+# Matches the SMILE SXI instrument geometry: 64 pixels spanning +/-7.75 deg.
+PHI_FOV_DEG = np.linspace(-7.75, 7.75, 64)
+
+
 def test3_is_mp_in_fov(image: np.ndarray) -> bool:
     """
     Test 3: Determines if the magnetopause (MP) is contained within the field of view.
-    Fits an asymmetric Gaussian to the azimuthal profile.
-
-
+    Fits an asymmetric Gaussian to the azimuthal profile and checks that its peak
+    falls within +/-8 deg of the field-of-view center.
     """
     av_phi = average_along_phi_axis(image)
-    
-    # Generate the x-axis grid (P) for the profile fitting
+    phi = PHI_FOV_DEG if len(av_phi) == len(PHI_FOV_DEG) else np.linspace(-7.75, 7.75, len(av_phi))
 
-    
-    initial_guess = [av_phi.max(), av_phi.argmax(), 3.0, 2.0, av_phi.min()]
-    
+    initial_guess = [av_phi.max(), phi[av_phi.argmax()], 3.0, 2.0, av_phi.min()]
+
     try:
-        popt, _ = curve_fit(asymmetric_gaussian, np.arange(len(av_phi)), av_phi, p0=initial_guess)
+        popt, _ = curve_fit(asymmetric_gaussian, phi, av_phi, p0=initial_guess)
     except RuntimeError:
         # Curve fitting failed to converge
         return False
-    if (popt[1] >=0) & (popt[1] <= len(av_phi)):
-        return True    
-    else :
-        return False 
+    return abs(popt[1]) <= 8
 
 
 def find_min_integration_time(index: int, directories: List[str], 
@@ -189,12 +188,11 @@ def find_min_integration_time(index: int, directories: List[str],
         if test1_is_structure_in_fov(image):
             valid_frames = 0
             
-            # Verify the structure remains visible for the next few integration steps
+            # Verify the structure remains visible for the next few integration steps.
+            # This intentionally may probe windows beyond max_ni: max_ni only bounds
+            # where the search for the minimum ni starts from, not how far ahead
+            # verification is allowed to look.
             for v_ni in range(ni + 1, ni + ni_verif + 1):
-                # Ensure we don't exceed max integration limit during verification
-                if v_ni > max_ni: 
-                    break 
-                    
                 v_image = stack_images(index, v_ni, directories)
                 v_image = remove_noise_with_tsvd(v_image, n_components=n_components)
                 
@@ -206,15 +204,15 @@ def find_min_integration_time(index: int, directories: List[str],
                 
     return (False, max_ni)
 
-def run_DTI_pipeline(index: int, directories: List[str], n_components: int,  max_ni: int = 10, 
-                     ni_verif: int = 3, ni_cusp: int = 30) -> Tuple[bool, int, np.ndarray]:
+def run_DTI_pipeline(index: int, directories: List[str], n_components: int,  max_ni: int = 10,
+                     ni_verif: int = 3, ni_cusp: int = 30, ni_mp: int = 10) -> Tuple[bool, int, np.ndarray]:
     """
     Executes the full Dynamic Time Integration (DTI) method pipeline.
-    
-    Evaluates an image sequence to determine if the magnetopause is visible, 
-    ensures the structure is not a magnetospheric cusp, and calculates the 
+
+    Evaluates an image sequence to determine if the magnetopause is visible,
+    ensures the structure is not a magnetospheric cusp, and calculates the
     minimum required integration time.
-    
+
     Args:
         index (int): The current central time index in the directory list.
         directories (List[str]): List of all available image directory paths.
@@ -222,7 +220,11 @@ def run_DTI_pipeline(index: int, directories: List[str], n_components: int,  max
         max_ni (int): Maximum integration time limit (in frames/minutes).
         ni_verif (int): Number of subsequent frames required to verify the structure.
         ni_cusp (int): Large integration window used specifically to identify slow-moving cusps.
-        
+        ni_mp (int): Fixed integration window used for the magnetopause-in-FOV test.
+            Kept fixed rather than using the optimized `ni`, so the test always runs
+            at a consistent SNR regardless of how short the detected integration
+            time is (matches the original analysis pipeline).
+
     Returns:
         Tuple[bool, int, np.ndarray]: 
             - bool: Final DTI status (True if Magnetopause is valid and visible, False otherwise).
@@ -263,16 +265,20 @@ def run_DTI_pipeline(index: int, directories: List[str], n_components: int,  max
     # ---------------------------------------------------------
     # TEST 3: Is the magnetopause properly contained in the FOV?
     # ---------------------------------------------------------
-    # Generate the final image using the optimized integration time (ni)
-    image = stack_images(index, ni, directories)
-    image = remove_noise_with_tsvd(image, n_components=n_components)
-    
-    status_mp = test3_is_mp_in_fov(image)
-    
+    # Uses the fixed ni_mp-frame window, not the optimized ni.
+    mp_image = stack_images(index, ni_mp, directories)
+    mp_image = remove_noise_with_tsvd(mp_image, n_components=n_components)
+
+    status_mp = test3_is_mp_in_fov(mp_image)
+
     # ---------------------------------------------------------
     # FINAL EVALUATION
     # ---------------------------------------------------------
     # DTI is valid IF: Structure is found AND it is NOT a cusp AND MP is in FOV.
     status_dti = status_structure and (not status_cusp) and status_mp
-    
+
+    # Report the image reconstructed at the optimized integration time.
+    image = stack_images(index, ni, directories)
+    image = remove_noise_with_tsvd(image, n_components=n_components)
+
     return status_dti, ni, image
