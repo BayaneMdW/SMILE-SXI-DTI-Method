@@ -63,4 +63,4 @@ else:
 
 ## Verification
 
-`examples.ipynb` runs the module against real SMILE SXI simulated data (the SMILE_challenge dataset) and its noise-free ground truth, and documents the results: a sweep of detections across PCA component counts (best accuracy ~91% around `n_components = 9-11`), a confusion matrix and precision/recall/accuracy curve against ground truth, standalone accuracy for Test 2 (~95%) and Test 3, and a worked experiment on making Test 3's curve fit more robust (concluding it should *not* be changed, since forcing convergence on ambiguous images trades honest failures for confidently wrong answers).
+`examples.ipynb` runs the module against real SMILE SXI simulated data (the SMILE_challenge dataset) and its noise-free ground truth, and documents the results: a sweep of detections across PCA component counts (best accuracy ~91% around `n_components = 9-11`), a per-image classification breakdown against ground truth, standalone accuracy for Test 2 (~95%), and what it usually means when Test 3's curve fit fails to converge.
