@@ -48,7 +48,7 @@ else:
     print("Magnetopause is obscured, absent, or a cusp. Interpret downstream analysis with caution.")
 ```
 
-### Individual tests
+### Available functions
 
 `run_DTI_pipeline` is the recommended entry point, but each test is also exposed independently for custom pipelines:
 
@@ -56,7 +56,8 @@ else:
 |---|---|
 | `stack_images(center_index, num_images, directories)` | Stack and exposure-normalize a window of frames |
 | `remove_noise_with_tsvd(image, n_components)` | Truncated-SVD denoising |
-| `find_min_integration_time(index, directories, ...)` | Test 1: minimum integration time for a visible structure |
+| `test1_is_structure_in_fov(image)` | Test 1: is a structural signal visible above the noise floor? |
+| `find_min_integration_time(index, directories, ...)` | Test 1, looped: minimum integration time for a visible structure |
 | `test2_is_cusp(image)` | Test 2: is this a magnetospheric cusp? |
 | `test3_is_mp_in_fov(image)` | Test 3: is the magnetopause contained in the field of view? |
 
